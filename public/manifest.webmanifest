@@ -1,0 +1,19 @@
+{
+  "name": "DopaPause",
+  "short_name": "DopaPause",
+  "description": "Pause your dopamine. Choose your action.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#071a33",
+  "theme_color": "#071a33",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
