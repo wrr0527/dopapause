@@ -91,6 +91,6 @@ All settings and records are saved only in the browser with local storage. No ac
 Each log stores:
 
 - `timestamp`
-- `selectedReason`
-- `selectedAction`
+- `selectedReason`: stable key for default items, or a one-off label for "Other"
+- `selectedAction`: stable key for default items, or a one-off label for "Other"
 - `outcome`: `didInstead` or `openedAnyway`

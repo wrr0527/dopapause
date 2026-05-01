@@ -37,6 +37,7 @@ export type ActionItem = PauseItem<DefaultActionKey>;
 export interface PauseLog {
   id: string;
   timestamp: string;
+  version: 3;
   selectedReason: string;
   selectedAction: string;
   outcome: Outcome;

@@ -6,6 +6,46 @@ const LANGUAGE_KEY = 'dopapause.language.v1';
 const REASONS_KEY = 'dopapause.reasons.v1';
 const ACTIONS_KEY = 'dopapause.actions.v1';
 const COUNTDOWN_SECONDS_KEY = 'dopapause.countdownSeconds.v1';
+const LEGACY_REASON_LABELS: Record<string, string> = {
+  Bored: 'bored',
+  '暇だから': 'bored',
+  Tired: 'tired',
+  '疲れている': 'tired',
+  'Want approval': 'wantApproval',
+  '誰かに反応してほしい': 'wantApproval',
+  'Comparing myself': 'comparingMyself',
+  '他人と比べてしまう': 'comparingMyself',
+  'Checking someone': 'comparingMyself',
+  '誰かが気になる': 'comparingMyself',
+  'Checking notifications': 'checkingNotifications',
+  '通知が気になる': 'checkingNotifications',
+  'Want stimulation': 'wantStimulation',
+  '刺激が欲しい': 'wantStimulation',
+  Lonely: 'lonely',
+  'なんとなく寂しい': 'lonely',
+  'Just habit': 'justHabit',
+  'ただの癖': 'justHabit',
+  Other: 'other',
+  'その他': 'other',
+};
+const LEGACY_ACTION_LABELS: Record<string, string> = {
+  'Take 3 deep breaths': 'deepBreaths',
+  '深呼吸を3回する': 'deepBreaths',
+  'Drink water': 'drinkWater',
+  '水を飲む': 'drinkWater',
+  'Do 10 squats': 'squats',
+  'スクワットを10回': 'squats',
+  'Read 1 page on Kindle': 'kindle',
+  'Kindleを1ページ読む': 'kindle',
+  'Do 5 vocabulary questions': 'vocabulary',
+  '単語を5問やる': 'vocabulary',
+  'Write 1 line in memo': 'memo',
+  'メモを1行書く': 'memo',
+  'Lie down for 3 minutes': 'lieDown',
+  '3分だけ横になる': 'lieDown',
+  Other: 'other',
+  'その他': 'other',
+};
 
 export const defaultReasons: ReasonItem[] = [
   { id: 'reason-bored', defaultKey: 'bored', label: 'Bored' },
@@ -14,6 +54,7 @@ export const defaultReasons: ReasonItem[] = [
   { id: 'reason-comparing', defaultKey: 'comparingMyself', label: 'Checking someone' },
   { id: 'reason-notifications', defaultKey: 'checkingNotifications', label: 'Checking notifications' },
   { id: 'reason-stimulation', defaultKey: 'wantStimulation', label: 'Want stimulation' },
+  { id: 'reason-lonely', defaultKey: 'lonely', label: 'Lonely' },
   { id: 'reason-habit', defaultKey: 'justHabit', label: 'Just habit' },
   { id: 'reason-other', defaultKey: 'other', label: 'Other' },
 ];
@@ -49,8 +90,9 @@ export function loadLogs(): PauseLog[] {
       return {
         id: typeof record.id === 'string' ? record.id : crypto.randomUUID(),
         timestamp: typeof record.createdAt === 'string' ? record.createdAt : new Date().toISOString(),
-        selectedReason: reason,
-        selectedAction: action,
+        version: 3,
+        selectedReason: normalizeStoredValue(reason, LEGACY_REASON_LABELS),
+        selectedAction: normalizeStoredValue(action, LEGACY_ACTION_LABELS),
         outcome,
       };
     });
@@ -64,15 +106,23 @@ export function loadLogs(): PauseLog[] {
 
 function normalizeLog(value: unknown): unknown {
   if (!value || typeof value !== 'object') return value;
-  const log = value as { selectedAction?: unknown };
+  const log = value as { selectedReason?: unknown; selectedAction?: unknown; version?: unknown };
   return {
     ...log,
-    selectedAction: typeof log.selectedAction === 'string' ? log.selectedAction : '',
+    version: 3,
+    selectedReason:
+      typeof log.selectedReason === 'string' ? normalizeStoredValue(log.selectedReason, LEGACY_REASON_LABELS) : '',
+    selectedAction:
+      typeof log.selectedAction === 'string' ? normalizeStoredValue(log.selectedAction, LEGACY_ACTION_LABELS) : '',
   };
 }
 
 export function saveLogs(logs: PauseLog[]) {
-  localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
+  try {
+    localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
+  } catch {
+    // Storage can fail in private mode or when the device is out of quota.
+  }
 }
 
 export function loadReasons(): ReasonItem[] {
@@ -97,7 +147,11 @@ export function loadCountdownSeconds() {
 }
 
 export function saveCountdownSeconds(seconds: number) {
-  localStorage.setItem(COUNTDOWN_SECONDS_KEY, String(normalizeCountdownSeconds(seconds)));
+  try {
+    localStorage.setItem(COUNTDOWN_SECONDS_KEY, String(normalizeCountdownSeconds(seconds)));
+  } catch {
+    // Ignore storage failures; the in-memory setting still applies for this session.
+  }
 }
 
 export function normalizeCountdownSeconds(seconds: number) {
@@ -111,7 +165,11 @@ export function loadLanguage(): Language {
 }
 
 export function saveLanguage(language: Language) {
-  localStorage.setItem(LANGUAGE_KEY, language);
+  try {
+    localStorage.setItem(LANGUAGE_KEY, language);
+  } catch {
+    // Ignore storage failures; the in-memory language still applies for this session.
+  }
 }
 
 export function dateKey(date: Date) {
@@ -123,14 +181,6 @@ export function dateKey(date: Date) {
 
 export function getTodaySummary(logs: PauseLog[]): DaySummary {
   return summarizeDay(logs, dateKey(new Date()));
-}
-
-export function getLastSevenDays(logs: PauseLog[]): DaySummary[] {
-  return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - index);
-    return summarizeDay(logs, dateKey(date));
-  });
 }
 
 export function getPeriodLogs(logs: PauseLog[], period: StatsPeriod): PauseLog[] {
@@ -242,7 +292,18 @@ function loadItems<T extends ReasonItem | ActionItem>(key: string, defaults: T[]
 }
 
 function saveItems<T extends ReasonItem | ActionItem>(key: string, items: T[], defaults: T[]) {
-  localStorage.setItem(key, JSON.stringify(items.length > 0 ? items : defaults));
+  try {
+    localStorage.setItem(key, JSON.stringify(items.length > 0 ? items : defaults));
+  } catch {
+    // Storage can fail in private mode or when the device is out of quota.
+  }
+}
+
+function normalizeStoredValue(value: string, legacyLabels: Record<string, string>) {
+  if (!value) return '';
+  if (value.startsWith('key:') || value.startsWith('label:')) return value;
+  const key = legacyLabels[value];
+  return key ? `key:${key}` : `label:${value}`;
 }
 
 function isPauseItem(value: unknown): value is ReasonItem | ActionItem {
@@ -256,6 +317,7 @@ function isPauseLog(value: unknown): value is PauseLog {
   const log = value as {
     id?: unknown;
     timestamp?: unknown;
+    version?: unknown;
     selectedReason?: unknown;
     selectedAction?: unknown;
     outcome?: unknown;
@@ -263,6 +325,7 @@ function isPauseLog(value: unknown): value is PauseLog {
   return (
     typeof log.id === 'string' &&
     typeof log.timestamp === 'string' &&
+    log.version === 3 &&
     typeof log.selectedReason === 'string' &&
     typeof log.selectedAction === 'string' &&
     (log.outcome === 'didInstead' || log.outcome === 'openedAnyway')

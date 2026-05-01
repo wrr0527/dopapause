@@ -163,11 +163,15 @@ p {
 }
 
 h1 {
-  max-width: 13ch;
+  max-width: 100%;
   color: #f7fbff;
-  font-size: clamp(2rem, 12vw, 3.55rem);
+  font-size: clamp(1.95rem, 10vw, 3.2rem);
   line-height: 1;
   letter-spacing: 0;
+}
+
+.hero h1 {
+  white-space: nowrap;
 }
 
 h2 {
@@ -286,7 +290,7 @@ h2 {
 }
 
 .compact-header h1 {
-  max-width: 12ch;
+  max-width: 100%;
   font-size: clamp(2rem, 10vw, 3rem);
 }
 

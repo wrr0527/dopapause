@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useState } from 'react';
-import { displayAction, displayReason, translations, type Copy } from './i18n';
+import { displayAction, displayReason, displayStoredAction, displayStoredReason, translations, type Copy } from './i18n';
 import {
   getDidInsteadRate,
   getPeriodLogs,
@@ -21,6 +21,7 @@ import {
 import type { ActionItem, Language, Outcome, PauseItem, PauseLog, RankingItem, ReasonItem, StatsPeriod, TrendSummary } from './types';
 
 type Screen = 'home' | 'customReason' | 'countdown' | 'actions' | 'stats' | 'settings';
+const MAX_INPUT_LENGTH = 56;
 
 function App() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -49,8 +50,22 @@ function App() {
     }),
     [periodLogs],
   );
-  const reasonRanking = useMemo(() => getRankings(periodLogs, 'selectedReason'), [periodLogs]);
-  const actionRanking = useMemo(() => getRankings(periodLogs, 'selectedAction'), [periodLogs]);
+  const reasonRanking = useMemo(
+    () =>
+      getRankings(periodLogs, 'selectedReason').map((item) => ({
+        ...item,
+        label: displayStoredReason(item.label, reasons, copy),
+      })),
+    [copy, periodLogs, reasons],
+  );
+  const actionRanking = useMemo(
+    () =>
+      getRankings(periodLogs, 'selectedAction').map((item) => ({
+        ...item,
+        label: displayStoredAction(item.label, actions, copy),
+      })),
+    [actions, copy, periodLogs],
+  );
   const didInsteadRate = useMemo(() => getDidInsteadRate(periodLogs), [periodLogs]);
 
   useEffect(() => saveLanguage(language), [language]);
@@ -88,7 +103,7 @@ function App() {
   }
 
   function startCustomPause() {
-    const label = customReasonDraft.trim();
+    const label = customReasonDraft.trim().slice(0, MAX_INPUT_LENGTH);
     if (!label) return;
     startPause({ id: 'custom-reason-current', label });
   }
@@ -107,7 +122,7 @@ function App() {
   }
 
   function useCustomAction() {
-    const label = customActionDraft.trim();
+    const label = customActionDraft.trim().slice(0, MAX_INPUT_LENGTH);
     if (!label) return;
     setSelectedAction({ id: 'custom-action-current', label });
     setIsCustomActionOpen(false);
@@ -119,8 +134,9 @@ function App() {
     const log: PauseLog = {
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
-      selectedReason: displayReason(selectedReason, copy),
-      selectedAction: selectedAction ? displayAction(selectedAction, copy) : '',
+      version: 3,
+      selectedReason: getStoredValue(selectedReason),
+      selectedAction: selectedAction ? getStoredValue(selectedAction) : '',
       outcome,
     };
 
@@ -220,7 +236,6 @@ function App() {
             copy={copy}
             reasons={reasons}
             onActionsChange={setActions}
-            onBack={() => setScreen('home')}
             onCountdownSecondsChange={(seconds) => setCountdownSeconds(normalizeCountdownSeconds(seconds))}
             onReasonsChange={setReasons}
           />
@@ -349,6 +364,7 @@ function CustomReasonScreen({ copy, value, onBack, onChange, onSubmit }: CustomR
         <input
           aria-label={copy.customReasonPlaceholder}
           autoFocus
+          maxLength={MAX_INPUT_LENGTH}
           placeholder={copy.customReasonPlaceholder}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -447,6 +463,7 @@ function ActionScreen({
               aria-label={copy.customActionPlaceholder}
               autoFocus
               placeholder={copy.customActionPlaceholder}
+              maxLength={MAX_INPUT_LENGTH}
               value={customActionDraft}
               onChange={(event) => onCustomActionChange(event.target.value)}
               onKeyDown={(event) => {
@@ -616,7 +633,6 @@ interface SettingsScreenProps {
   copy: Copy;
   reasons: ReasonItem[];
   onActionsChange: (actions: ActionItem[]) => void;
-  onBack: () => void;
   onCountdownSecondsChange: (seconds: number) => void;
   onReasonsChange: (reasons: ReasonItem[]) => void;
 }
@@ -652,15 +668,15 @@ function SettingsScreen({
       </section>
 
       <EditableList
-        addPlaceholder={copy.addReasonPlaceholder}
         copy={copy}
+        getDisplayLabel={(item) => displayReason(item, copy)}
         items={reasons}
         title={copy.reasonsTitle}
         onChange={onReasonsChange}
       />
       <EditableList
-        addPlaceholder={copy.addActionPlaceholder}
         copy={copy}
+        getDisplayLabel={(item) => displayAction(item, copy)}
         items={actions}
         title={copy.actionsTitle}
         onChange={onActionsChange}
@@ -670,14 +686,14 @@ function SettingsScreen({
 }
 
 interface EditableListProps<T extends PauseItem> {
-  addPlaceholder: string;
   copy: Copy;
+  getDisplayLabel: (item: T) => string;
   items: T[];
   title: string;
   onChange: (items: T[]) => void;
 }
 
-function EditableList<T extends PauseItem>({ addPlaceholder, copy, items, title, onChange }: EditableListProps<T>) {
+function EditableList<T extends PauseItem>({ copy, getDisplayLabel, items, title, onChange }: EditableListProps<T>) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
 
@@ -687,7 +703,7 @@ function EditableList<T extends PauseItem>({ addPlaceholder, copy, items, title,
   }
 
   function saveEdit(id: string) {
-    const label = editingValue.trim();
+    const label = editingValue.trim().slice(0, MAX_INPUT_LENGTH);
     if (!label) return;
     onChange(items.map((item) => (item.id === id ? ({ ...item, label } as T) : item)));
     setEditingId(null);
@@ -700,12 +716,7 @@ function EditableList<T extends PauseItem>({ addPlaceholder, copy, items, title,
 
       <div className="editable-list">
         {items.map((item) => {
-          const displayLabel =
-            'reasonLabels' in copy && item.defaultKey && item.defaultKey in copy.reasonLabels
-              ? copy.reasonLabels[item.defaultKey as keyof typeof copy.reasonLabels]
-              : item.defaultKey && item.defaultKey in copy.actionLabels
-                ? copy.actionLabels[item.defaultKey as keyof typeof copy.actionLabels]
-                : item.label;
+          const displayLabel = getDisplayLabel(item);
           const isOther = isOtherItem(item);
 
           return (
@@ -714,6 +725,7 @@ function EditableList<T extends PauseItem>({ addPlaceholder, copy, items, title,
                 <>
                   <input
                     aria-label={copy.edit}
+                    maxLength={MAX_INPUT_LENGTH}
                     value={editingValue}
                     onChange={(event) => setEditingValue(event.target.value)}
                     onKeyDown={(event) => {
@@ -750,6 +762,10 @@ function EditableList<T extends PauseItem>({ addPlaceholder, copy, items, title,
 
 function isOtherItem(item: PauseItem) {
   return item.defaultKey === 'other';
+}
+
+function getStoredValue(item: PauseItem) {
+  return item.defaultKey && item.defaultKey !== 'other' ? `key:${item.defaultKey}` : `label:${item.label}`;
 }
 
 export default App;

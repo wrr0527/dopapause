@@ -5,21 +5,18 @@ export const translations = {
     languageName: 'EN',
     status: '10-second intent check',
     tagline: 'Pause. Choose.',
-    subtitle: '',
     question: 'Why do you want to open it now?',
     records: 'Stats',
     settings: 'Settings',
     pause: 'Pause',
     pausesWonToday: 'did instead today',
     reason: 'Reason',
-    urgeHelper: 'Let the urge pass through before you decide.',
     waiting: 'Waiting...',
     chooseNextAction: 'Choose next action',
     beforeScrolling: 'Before scrolling',
     chooseOne: 'Choose one before scrolling',
     didInstead: 'Do this instead',
     openAnyway: 'Open it anyway',
-    statsEyebrow: 'Stats',
     pauseTrail: 'Your pause trail',
     didInsteadToday: 'Did instead today',
     openedAnywayToday: 'Opened anyway today',
@@ -38,20 +35,15 @@ export const translations = {
     langLabel: 'Language',
     settingsTitle: 'Customize',
     countdownSeconds: 'Pause seconds',
-    settingsSubtitle: '',
     reasonsTitle: 'Reasons',
     actionsTitle: 'Actions',
-    addReasonPlaceholder: 'Add a reason',
-    addActionPlaceholder: 'Add an action',
     customReasonPlaceholder: 'Type a reason',
     customActionPlaceholder: 'Type an action',
-    add: 'Add',
     useThis: 'Use this',
     save: 'Save',
     cancel: 'Cancel',
     edit: 'Edit',
     fixed: 'Fixed',
-    delete: 'Delete',
     back: 'Back',
     emptyList: 'Keep at least one item.',
     pauseMessages: [
@@ -86,21 +78,18 @@ export const translations = {
     languageName: '日本語',
     status: '10秒の衝動チェック',
     tagline: 'いったん止まる',
-    subtitle: '',
     question: '今、開きたくなった理由は？',
     records: '集計',
     settings: '設定',
     pause: 'チェック',
     pausesWonToday: '今日立ち止まった回数',
     reason: '理由',
-    urgeHelper: '決める前に、衝動が少し落ち着くのを待とう。',
     waiting: '待機中...',
     chooseNextAction: '次の行動を選ぶ',
     beforeScrolling: 'スクロールの前に',
     chooseOne: 'スクロールする前に1つ選ぼう',
     didInstead: '代わりにこれをやる',
     openAnyway: 'それでも開く',
-    statsEyebrow: '集計',
     pauseTrail: '自分の傾向',
     didInsteadToday: '立ち止まった',
     openedAnywayToday: '開いた',
@@ -119,20 +108,15 @@ export const translations = {
     langLabel: '言語',
     settingsTitle: 'カスタマイズ',
     countdownSeconds: '待つ秒数',
-    settingsSubtitle: '',
     reasonsTitle: '理由',
     actionsTitle: '代替行動',
-    addReasonPlaceholder: '理由を追加',
-    addActionPlaceholder: '行動を追加',
     customReasonPlaceholder: '理由を入力',
     customActionPlaceholder: '行動を入力',
-    add: '追加',
     useThis: 'これにする',
     save: '保存',
     cancel: 'キャンセル',
     edit: '編集',
     fixed: '固定',
-    delete: '削除',
     back: '戻る',
     emptyList: '最低1つは残してください。',
     pauseMessages: [
@@ -169,21 +153,18 @@ export const translations = {
     languageName: string;
     status: string;
     tagline: string;
-    subtitle: string;
     question: string;
     records: string;
     settings: string;
     pause: string;
     pausesWonToday: string;
     reason: string;
-    urgeHelper: string;
     waiting: string;
     chooseNextAction: string;
     beforeScrolling: string;
     chooseOne: string;
     didInstead: string;
     openAnyway: string;
-    statsEyebrow: string;
     pauseTrail: string;
     didInsteadToday: string;
     openedAnywayToday: string;
@@ -202,20 +183,15 @@ export const translations = {
     langLabel: string;
     settingsTitle: string;
     countdownSeconds: string;
-    settingsSubtitle: string;
     reasonsTitle: string;
     actionsTitle: string;
-    addReasonPlaceholder: string;
-    addActionPlaceholder: string;
     customReasonPlaceholder: string;
     customActionPlaceholder: string;
-    add: string;
     useThis: string;
     save: string;
     cancel: string;
     edit: string;
     fixed: string;
-    delete: string;
     back: string;
     emptyList: string;
     pauseMessages: string[];
@@ -227,9 +203,51 @@ export const translations = {
 export type Copy = (typeof translations)[Language];
 
 export function displayReason(reason: ReasonItem, copy: Copy) {
-  return reason.defaultKey ? copy.reasonLabels[reason.defaultKey] : reason.label;
+  if (!reason.defaultKey || hasCustomReasonLabel(reason)) return reason.label;
+  return copy.reasonLabels[reason.defaultKey];
 }
 
 export function displayAction(action: ActionItem, copy: Copy) {
-  return action.defaultKey ? copy.actionLabels[action.defaultKey] : action.label;
+  if (!action.defaultKey || hasCustomActionLabel(action)) return action.label;
+  return copy.actionLabels[action.defaultKey];
+}
+
+export function displayStoredReason(value: string, reasons: ReasonItem[], copy: Copy) {
+  const key = readStoredKey(value);
+  const reason = key ? reasons.find((item) => item.defaultKey === key) : null;
+  if (reason) return displayReason(reason, copy);
+  return readStoredLabel(value);
+}
+
+export function displayStoredAction(value: string, actions: ActionItem[], copy: Copy) {
+  const key = readStoredKey(value);
+  const action = key ? actions.find((item) => item.defaultKey === key) : null;
+  if (action) return displayAction(action, copy);
+  return readStoredLabel(value);
+}
+
+function readStoredKey(value: string) {
+  return value.startsWith('key:') ? value.slice(4) : '';
+}
+
+function readStoredLabel(value: string) {
+  return value.startsWith('label:') ? value.slice(6) : value;
+}
+
+function hasCustomReasonLabel(reason: ReasonItem) {
+  return Boolean(
+    reason.defaultKey &&
+      reason.defaultKey !== 'other' &&
+      reason.label !== translations.en.reasonLabels[reason.defaultKey] &&
+      reason.label !== translations.ja.reasonLabels[reason.defaultKey],
+  );
+}
+
+function hasCustomActionLabel(action: ActionItem) {
+  return Boolean(
+    action.defaultKey &&
+      action.defaultKey !== 'other' &&
+      action.label !== translations.en.actionLabels[action.defaultKey] &&
+      action.label !== translations.ja.actionLabels[action.defaultKey],
+  );
 }
